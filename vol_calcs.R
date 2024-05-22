@@ -137,3 +137,76 @@ write_csv(vol_df,
 # mean(pallid$sac_volume_uL)
 # sd(pallid$sac_volume_uL)
 
+
+
+######
+#  get mean fractional difference between anterior and posterior
+#####
+
+# assign ant.post category rather than just names
+
+sac_category <- c(post1 = "post", 
+                  post2 = "post", 
+                  ant1 = "ant", 
+                  ant2 = "ant")
+
+print(sac_category)
+
+
+vol_df <- vol_df %>% 
+  mutate(ant.post = sac_category[sac])
+
+print(vol_df)
+
+# get mean values for ant and post volume and take the fractional difference
+estimate_ant.diff <- vol_df %>%
+  select(indvd, sac_volume_uL, ant.post) %>%
+  group_by(ant.post) %>%
+  mutate(ant.post_vol = mean(sac_volume_uL)) %>%
+  select(-indvd, -sac_volume_uL) %>%
+  unique()
+
+print(estimate_ant.diff)  
+
+ant.post_diff <- estimate_ant.diff$ant.post_vol[2] / estimate_ant.diff$ant.post_vol[1]
+
+# right now, each individual has volume made of mean tip and mean midsec
+## find indvds with only posteriors recorded and apply ant.post_diff to half the total volume value
+
+where.ant <- vol_df %>%
+  select(indvd, ant.post, larva_air.vol_uL) %>%
+  filter(ant.post == "ant") %>%
+  print()
+
+# Make post only data frame to modeify the total volumes of 
+post_only <- vol_df %>%
+  select(indvd, ant.post, larva_air.vol_uL) %>%
+  filter(!indvd == "larva1" 
+         & !indvd == "larva2" 
+         & !indvd == "larva3" 
+         & !indvd == "larva4") %>%
+  mutate(vol.adj = (larva_air.vol_uL / 2) + 
+           ((larva_air.vol_uL / 2) * ant.post_diff)) %>% # half the vol plus the other half times diff factor
+  mutate(larva_air.vol_uL = NULL) %>%
+  rename(larva_air.vol_uL = vol.adj)
+
+print(post_only)
+
+# sub in ajdusted post only total air volumes
+
+larvs_with_ant <- vol_df %>%
+  select(indvd, ant.post, larva_air.vol_uL) %>%
+  filter(indvd == "larva1" 
+         | indvd == "larva2" 
+         | indvd == "larva3" 
+         | indvd == "larva4")
+print(larvs_with_ant)
+
+# total larva air volume tells you mass displaced to achieve ~ neutral buoyancy (sacs at pH 6)
+vol.adj <- rbind(larvs_with_ant, post_only) %>%
+  group_by(ant.post) %>%
+  mutate(mean_1sac_vol.ap = (mean(larva_air.vol_uL))/2) %>%
+  mutate(sd_1sac_vol.ap = (sd(larva_air.vol_uL/2))) %>%
+  print()
+
+

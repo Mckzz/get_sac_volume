@@ -109,16 +109,11 @@ vol_df <- vol_df %>%
   mutate(sac_volume_uL = sum_tip_vol + midsec_vol) %>%
   group_by(indvd) %>%
   mutate(larva_air.vol_uL = 
-           (mean(sum_tip_vol)*8) + 
+           (mean(sum_tip_vol)*4) + # x 4, not 8, because it's the sum of both tips
            (mean(midsec_vol)*4)) ## mean tip value (one number) x 8 (8 sac tips per larva), 4 midsecs per larva
 
 print(vol_df)
 str(vol_df)
-
-# a spreadsheet with pH 6 (excised) sac volumes, written to whichever directory
-write_csv(vol_df,
-          "~/student_documents/UBC/Research/Malawi/data\\sac pressure, pH series (6, 7, 8)/sac_volume.csv")
-
 
 
 ####   pull out some means for the species
@@ -174,13 +169,13 @@ ant.post_diff <- estimate_ant.diff$ant.post_vol[2] / estimate_ant.diff$ant.post_
 ## find indvds with only posteriors recorded and apply ant.post_diff to half the total volume value
 
 where.ant <- vol_df %>%
-  select(indvd, ant.post, larva_air.vol_uL) %>%
+  select(indvd, ant.post, sac_volume_uL,larva_air.vol_uL) %>%
   filter(ant.post == "ant") %>%
   print()
 
-# Make post only data frame to modeify the total volumes of 
+# Make post only data frame to modify the total volumes using the ant/post ratio
 post_only <- vol_df %>%
-  select(indvd, ant.post, larva_air.vol_uL) %>%
+  select(indvd, ant.post, sac_volume_uL, larva_air.vol_uL) %>%
   filter(!indvd == "larva1" 
          & !indvd == "larva2" 
          & !indvd == "larva3" 
@@ -188,14 +183,15 @@ post_only <- vol_df %>%
   mutate(vol.adj = (larva_air.vol_uL / 2) + 
            ((larva_air.vol_uL / 2) * ant.post_diff)) %>% # half the vol plus the other half times diff factor
   mutate(larva_air.vol_uL = NULL) %>%
-  rename(larva_air.vol_uL = vol.adj)
+  rename(larva_air.vol_uL = vol.adj) #the same "larva_air.vol_uL" now uses the adjusted posterior values
 
 print(post_only)
+#print(vol_df)
 
 # sub in ajdusted post only total air volumes
 
-larvs_with_ant <- vol_df %>%
-  select(indvd, ant.post, larva_air.vol_uL) %>%
+larvs_with_ant <- vol_df %>% # includes the posteriors of those larvae
+  select(indvd, ant.post, sac_volume_uL, larva_air.vol_uL) %>%
   filter(indvd == "larva1" 
          | indvd == "larva2" 
          | indvd == "larva3" 
@@ -204,9 +200,11 @@ print(larvs_with_ant)
 
 # total larva air volume tells you mass displaced to achieve ~ neutral buoyancy (sacs at pH 6)
 vol.adj <- rbind(larvs_with_ant, post_only) %>%
-  group_by(ant.post) %>%
-  mutate(mean_1sac_vol.ap = (mean(larva_air.vol_uL))/2) %>%
-  mutate(sd_1sac_vol.ap = (sd(larva_air.vol_uL/2))) %>%
+  group_by(ant.post) %>% # looking for mean ant sac and mean post sac across larvae, so not grouped by larva
+  mutate(mean_1sac_vol.ap = (mean(sac_volume_uL))) %>%
+  mutate(sd_1sac_vol.ap = (sd(sac_volume_uL))) %>%
   print()
 
-
+# a spreadsheet with pH 6 (excised) sac volumes, written to whichever directory
+write_csv(vol.adj,
+          "~/student_documents/UBC/Research/Malawi/data\\sac pressure, pH series (6, 7, 8)/sac_volume.csv")
